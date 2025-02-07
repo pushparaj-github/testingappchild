@@ -1,0 +1,46 @@
+import requests
+
+# GitLab Configuration
+GITLAB_URL = "https://gitlab.company.com/api/v4"
+PROJECT_ID = "123456"  # Replace with your actual project ID
+PRIVATE_TOKEN = "your_access_token"
+
+# Branch conditions (only apply rules to these)
+MATCHING_PREFIXES = ["qa/", "dev/"]
+
+# Headers
+headers = {"PRIVATE-TOKEN": PRIVATE_TOKEN, "Content-Type": "application/json"}
+
+# Step 1: Get all branches
+response = requests.get(f"{GITLAB_URL}/projects/{PROJECT_ID}/repository/branches", headers=headers)
+
+if response.status_code == 200:
+    branches = response.json()
+else:
+    print(f"❌ Error fetching branches: {response.text}")
+    exit()
+
+# Step 2: Filter branches that match the conditions
+filtered_branches = [branch["name"] for branch in branches if any(branch["name"].startswith(prefix) for prefix in MATCHING_PREFIXES)]
+
+if not filtered_branches:
+    print("⚠️ No matching branches found.")
+    exit()
+
+print(f"✅ Matching branches: {filtered_branches}")
+
+# Step 3: Add merge approval rules for each matching branch
+for branch_name in filtered_branches:
+    rule_data = {
+        "name": f"Approval Rule for {branch_name}",
+        "approvals_required": 2,  # Set required approvals
+        "target_branch": branch_name,
+        "approver_ids": [101, 202]  # Replace with actual GitLab user IDs
+    }
+    
+    rule_response = requests.post(f"{GITLAB_URL}/projects/{PROJECT_ID}/approval_rules", headers=headers, json=rule_data)
+
+    if rule_response.status_code == 201:
+        print(f"✅ Merge approval rule added for branch: {branch_name}")
+    else:
+        print(f"❌ Error adding rule for {branch_name}: {rule_response.text}")
